@@ -6,8 +6,8 @@
 - zkopírovat obsah adresáře *"upload"* ze staženého souboru *"opencart-2.3.0.2.zip"* na server 
 - do tohoto defaultního stavu udělat změny, potřebné pro přidání češtiny:
     - zkopírovat soubory ze zip archivu *"cestina-2.3.0.2.zip"* (v tomto projektu) do odpovídajících adresářů aplikace na serveru
-    - pouze čeština: na serveru nahradit soubor *"install/opencart.sql"* souborem *"opencart-cz.sql"* z tohoto projektu
-    - připravené pro culici.cz: na serveru nahradit soubor *"install/opencart.sql"* souborem *"opencart-culici.sql"* z tohoto projektu   
+    - **obecný oc, čeština**: na serveru nahradit soubor *"install/opencart.sql"* souborem *"opencart-cz.sql"* z tohoto projektu
+    - **oc culici.cz**: na serveru nahradit soubor *"install/opencart.sql"* souborem *"opencart-culici.sql"* z tohoto projektu   
 - dále pokračovat v instalaci podle návodu (soubor *"install.txt"* v *"opencart-2.3.0.2.zip"*), krok č. 1 už je hotov.
 - instalace je hotova 
 
@@ -42,4 +42,12 @@ Nyní je potřeba češtinu přidat v administraci aplikace a nastavit ji jako p
 Tím jsou "počeštěné" jak uživatelské, tak administrátorské prostředí. Ale ještě je potřeba přeložit různé číselníky, přidat CZK jako měnu, nastavit daňovou oblast, třídu a sazbu, ... Toto provádí správce přímo v aplikaci, volba *System > Lokalizace*. Některé položky (třeba daně) nepůjde zrušit, dokud na ně budou navázané produkty.
 
 Všechny potřebné úpravy byly provedeny v referenční instalaci aplikace, následně byl obsah DB exportován do souboru *"opencart-cz.sql"*.
+
+## Instalace rozšíření ##
+
+Defaultně se rozšíření OC instalují pomocí ftp. Nevím proč, navíc na lokálním PC nemám ftp server, takže napřed potřebuji OC naučit instalovat rozšíření bez ftp.
+
+### Rozšíření: localcopy.ocmod (instalátor bez ftp) ###
+
+- nainstalovat rozšíření *localcopy.zip* z tohoto projektu podle návodu, který je v archivu.
  

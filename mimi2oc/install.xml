@@ -1,0 +1,54 @@
+<modification>
+	<name>Sync with Mimibazar</name>
+	<code>Sync with Mimibazar</code>
+	<version>1.0</version>
+	<author>patec</author>
+	<file path="admin/controller/common/menu.php">
+		<operation error="skip">
+			<search><![CDATA[$data['text_backup'] = $this->language->get('text_backup');]]></search>
+			<add position="after"><![CDATA[
+		$data['text_mimi2oc'] = $this->language->get('text_mimi2oc');
+			]]></add>
+		</operation>
+		<operation error="skip">
+			<search><![CDATA[$data['backup'] = $this->url->link('tool/backup', 'token=' . $this->session->data['token'],]]></search>
+			<add position="after"><![CDATA[
+		$data['mimi2oc'] = $this->url->link('tool/mimi2oc', 'token=' . $this->session->data['token'], (version_compare(PHP_VERSION, '2.2.0.0') >= 0) ? true : 'SSL');
+			]]></add>
+		</operation>
+	</file>
+	<file path="admin/language/*/common/menu.php">
+		<operation error="skip">
+			<search><![CDATA[$_['text_backup']]]></search>
+			<add position="after"><![CDATA[
+$_['text_mimi2oc'] = 'Sync with Mimibazar';
+			]]></add>
+		</operation>
+	</file>
+	<file path="admin/view/template/common/menu.tpl">
+		<operation error="skip">
+			<search><![CDATA[<li><a href="<?php echo $backup; ?>"><?php echo $text_backup; ?></a></li>]]></search>
+			<add position="replace"><![CDATA[<li><a href="<?php echo $backup; ?>"><?php echo $text_backup; ?></a></li><li><a href="<?php echo $mimi2oc; ?>"><?php echo $text_mimi2oc; ?></a></li>]]></add>
+		</operation>
+	</file>
+	<file path="admin/controller/common/column_left.php">
+		<operation error="skip">
+			<search><![CDATA[if ($this->user->hasPermission('access', 'tool/log')) {]]></search>
+			<add position="before"><![CDATA[
+			$tool[] = array(
+				'name'	   => $this->language->get('text_mimi2oc'),
+				'href'     => $this->url->link('tool/mimi2oc', 'token=' . $this->session->data['token'], true),
+				'children' => array()		
+			);
+			]]></add>
+		</operation>
+	</file>
+	<file path="admin/language/*/common/column_left.php">
+		<operation error="skip">
+			<search><![CDATA[$_['text_backup']]]></search>
+			<add position="after"><![CDATA[
+$_['text_mimi2oc']             = 'Sync with Mimibazar';
+			]]></add>
+		</operation>
+	</file>
+</modification>

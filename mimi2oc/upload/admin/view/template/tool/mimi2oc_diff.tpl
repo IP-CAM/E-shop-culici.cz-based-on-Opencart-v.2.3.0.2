@@ -15,39 +15,53 @@
 
 	<div class="container-fluid">
 		<div class="panel panel-default">
-		<?php if (isset($diff->error)) { ?>
+		<?php if (count($diff->errors)) { ?>
 		
 			<div class="panel-body text-danger">
-				<?php echo $diff->error; ?>
+				<?php echo join('<br>', $diff->errors); ?>
 			</div>
-			
+		<?php } ?>
+		
 			<div class="panel-body">
-				<?php echo $log; ?>
-			</div>			
-			<div class="panel-footer">
-				<strong class='text-danger'>Synchronizaci nelze provést.</strong>
-			</div>			
-			
-		<?php } else { ?>
+				<strong>Noví výrobci</strong>
+				<br>
+				<?php 
+				if (count($diff->new_manufacturers))
+					foreach ($diff->new_manufacturers as $m)
+						echo $m['name'].'<br>';
+				else 
+					echo '(žádný nový výrobce)';
+				?>
+			</div>		
 				
 			<div class="panel-body">
 				<strong>Nové výrobky</strong>
+				<br>
 			</div>
 			
 			<div class="panel-body">
 				<strong>Výrobky, které je potřeba skrýt</strong>
+				<br>
 			</div>
 			
 			<div class="panel-body">
 				<strong>Výrobky, které je potřeba zobrazit</strong>
-			</div>			
-				
+				<br>
+			</div>
+			
 			<div class="panel-footer">
 				<a href="<?php echo $sync_url; ?>" class="btn btn-danger"><i class="fa fa-refresh"></i> Spustit synchronizaci!</a>
 			</div>
-			
-		<?php } ?>	
 		</div>
+		
+		<div class="panel panel-info">
+			<div class="panel-body">
+				<strong>LOG:</strong>
+				<br>
+				<hr>
+				<?php echo $diff->log; ?>
+			</div>
+		</div>		
 	</div>
 </div>
 

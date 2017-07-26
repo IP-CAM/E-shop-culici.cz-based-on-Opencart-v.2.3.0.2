@@ -137,6 +137,105 @@ class ModelToolMimi2oc extends Model
 	}	
 	
 	/**
+	 * Stahne vsechny informace o tomto vyrobku ze stranek mimibazaru.
+	 *
+	 * @param unknown $id
+	 * @param stdClass $album
+	 * @return void
+	 */
+	private function _handleMimiProduct($id, $album)
+	{
+		$doc = $this->_get_file($this->_productUrl.$id);
+	
+		$product = new stdClass();
+		$product->name = '???';
+		$product->description = '';
+		$product->manufacturer = $this->_mapMimibazarManufacturer('(neuveden)');
+		$product->photos = array();
+	
+		$product->variants = array(new stdClass());
+		$variant = $product->variants[0];
+		$variant->mimiId = $id;
+		$variant->price = '';
+		$variant->size = '';
+		$variant->proportions = '';
+	
+		$container = $doc->getElementById('trup');
+		if (!$container)
+			return;
+	
+		$items = $container->getElementsByTagName('*');
+		foreach ($items as $item)
+		{
+			$itemprop = $item->getAttribute('itemprop');
+	
+			//info pro produkt
+			if ($item->tagName == 'span' && $itemprop == 'name')
+				$product->name = $item->textContent;
+			else if ($item->tagName == 'div' && $itemprop == 'description')
+				$product->description = $item->textContent;
+			else if ($item->tagName == 'span' && $itemprop == 'brand')
+				$product->manufacturer = $this->_mapMimibazarManufacturer($item->textContent);
+				
+			//info pro tuto konkretni variantu
+			else if ($item->tagName == 'span' && $itemprop == 'price')
+				$variant->price = (int)$item->textContent;
+			else if ($item->tagName == 'div' && strpos($item->textContent, 'VELIKOST: ') === 0)
+				$variant->size = substr($item->textContent, strlen('VELIKOST: '));
+			else if ($item->tagName == 'div' && strpos($item->textContent, 'ROZMĚRY: ') === 0)
+				$variant->proportions = substr($item->textContent, strlen('ROZMĚRY: '));
+				
+			//fotky
+			else if ($item->tagName == 'a' && $item->getAttribute('class') == 'cb-foto-g2')
+				$product->photos[] = $item->getAttribute('href');
+		}
+	
+		//bud se jedna o novy produkt, nebo o variantu jiz existujiciho
+		$uid = md5($product->name.'#'.$product->description.'#'.$product->manufacturer['name']);
+		if (isset($album->products[$uid]))
+		{
+			//varianta existujiciho vyrobku
+			$album->products[$uid]->variants[] = $variant;
+			//pridam pripadne nove fotky
+			foreach ($product->photos as $photo)
+				if (!in_array($photo, $album->products[$uid]->photos))
+					$album->products[$uid]->photos[] = $photo;
+		}
+		else
+		{
+			//novy produkt
+			$album->products[$uid] = $product;
+		}
+	}	
+	
+	/**
+	 * Najdu vsechny produkty na zadane strance alba.
+	 * @param unknown $page
+	 * @param unknown $album
+	 */	
+	private function _handleAlbumPage($page, $album)
+	{
+		//najdu vsechny produkty
+		//protoze na jeden produkt existuji duplicitni odkazy, 
+		//tak si eviduji, ktere produkty uz jsem zpracoval
+		$handledProducts = array();
+		
+		foreach ($page->getElementsByTagName('a') as $a)
+		{
+			$href = $a->getAttribute('href');
+			if (strpos($href, $this->_productUrl) === 0)
+			{
+				$id = $this->_extractID($href);
+				if (!in_array($id, $handledProducts))
+				{
+					$handledProducts[] = $id;
+					$this->_handleMimiProduct($id, $album);
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Fce stahne seznam alb a id jejich vyrobku ze stranky mimibazaru.
 	 */
 	private function _getMimibazarData()
@@ -156,129 +255,68 @@ class ModelToolMimi2oc extends Model
 				$album->href = $href;
 				$album->name = $name;
 				$album->category = $this->_mapMimibazarCategory($name);
-				$album->pages = array();
+				$album->products = array();
 				$this->data->albums[] = $album;
-				$this->log('Album: '.$name.' ('.$href.')', 2);
+				
+				$h = '<a href="'.$album->href.'" target="_blank">'.$album->name.'</a>'; 
+				$this->log('Album: '.$h, 2);
+				$this->log('Kategorie: '.$album->category['name'], 4);
 			}
 		}
 		$this->log('');
 		
-		//projdu alba
-		//foreach ($this->data->albums as $album)
-		$album = $this->data->albums[0];
+		//projdu alba, najdu produkty
+		foreach ($this->data->albums as $album)
+		//$album = $this->data->albums[8];
 		{
 			$this->log('Zpracovani alba: <strong>'.$album->name.'</strong>');
 			
-			$this->log('Stranky alba', 2);
 			//najdu odkazy na vsechny strany alba
 			//pokud ma album vice stranek, uvodni (prvni) stranka obsahuje i odkaz sama na sebe.
 			$doc = $this->_get_file($album->href);
+			$numPages = 0;
 			
 			foreach ($doc->getElementsByTagName('a') as $a)
 			{
 				$href = str_replace('&amp;', '&', $a->getAttribute('href'));
-				if (strpos($href, '?strana=') === 0 && !isset($album->pages[$href]))
+				if (strpos($href, '?strana=') === 0)
 				{
-					$album->pages[$href] = $href;
-					$this->log($href, 4);
+					$numPages++;
+					$page = $this->_get_file($this->_mimiUrl.'bazar.php'.$href);
+					$this->_handleAlbumPage($page, $album);
 				}
 			}
 			
-			if (count($album->pages) == 0)
+			if ($numPages == 0)
 			{
-				//pouze jedna strana
-				$album->pages[$album->href] = $album->href;
-				$this->log($album->href, 4);
+				//album ma jen tuto jednu hlavni stranu
+				$this->_handleAlbumPage($doc, $album);
 			}
-			$this->log('');
-		
-			//najdu vsechny produkty
-			$this->log('Hledani produktu', 2);
-			foreach ($album->pages as $page)
+			
+			//do logu vypisu nalezene produkty
+			$this->log('Produkty', 2);
+			foreach ($album->products as $product)
 			{
-				if ($page[0] == '?')
-					$doc = $this->_get_file($this->_mimiUrl.'bazar.php'.$page);
-				else
-					$doc = $this->_get_file($page);
-				
-				foreach ($doc->getElementsByTagName('a') as $a)
+				$this->log($product->name, 4);
+				$this->log('<small>popis: '.$product->description.'</small>', 4);
+				$this->log('<small>výrobce: '.$product->manufacturer['name'].'</small>', 4);
+				$this->log('<small>počet variant: '.count($product->variants).'</small>', 4);
+					
+				foreach ($product->variants as $variant)
 				{
-					$href = $a->getAttribute('href');
-					if (strpos($href, $this->_productUrl) === 0)
-					{
-						$id = $this->_extractID($href);
-						if (!isset($this->data->products[$id]))
-						{
-							$product = $this->_getMimiProduct($id);
-							$this->data->products[$id] = $product; 
-						}
-					}
+					$h = '<a href="'.$this->_productUrl.$variant->mimiId.'" target="_blank">'.$variant->mimiId.'</a>';
+					$this->log('<small>mimi ID: '.$h
+							.', cena: '.$variant->price
+							.', velikost: '.$variant->size
+							.', rozměry: '.$variant->proportions
+							.'</small>', 8);
 				}
 			}
-			$this->log('');
-		}
+			$this->log('');			
+		}	
 	}
 	
-	/**
-	 * Stahne vsechny informace o tomto vyrobku ze stranek mimibazaru.
-	 * 
-	 * @param unknown $id
-	 * @return stdClass|string
-	 */
-	private function _getMimiProduct($id)
-	{
-		$doc = $this->_get_file($this->_productUrl.$id);
-		$product = new stdClass();
-		$product->id = $id;
-		$product->name = '???';
-		$product->description = '';
-		$product->manufacturer = $this->_mapMimibazarManufacturer('(neuveden)');
-		$product->photos = array();
-		
-		$product->variants = array();
-		$variant = new stdClass();
-		$variant->price = '';
-		$variant->size = '';
-		$variant->proportions = '';
-		$product->variants[] = $variant;
-		
-		
-		$container = $doc->getElementById('trup');
-		if (!$container)
-			return $product;
-		
-		$items = $container->getElementsByTagName('*');
-		foreach ($items as $item)
-		{
-			$itemprop = $item->getAttribute('itemprop');
 
-			//info pro produkt
-			if ($item->tagName == 'span' && $itemprop == 'name')
-				$product->name = $item->textContent;
-			else if ($item->tagName == 'div' && $itemprop == 'description')
-				$product->description = $item->textContent;
-			else if ($item->tagName == 'span' && $itemprop == 'brand')
-				$product->manufacturer = $this->_mapMimibazarManufacturer($item->textContent);
-			
-			//info pro tuto konkretni variantu
-			else if ($item->tagName == 'span' && $itemprop == 'price')
-				$variant->price = (int)$item->textContent;
-			else if ($item->tagName == 'div' && strpos($item->textContent, 'VELIKOST: ') === 0)
-				$variant->size = substr($item->textContent, strlen('VELIKOST: '));
-			else if ($item->tagName == 'div' && strpos($item->textContent, 'ROZMĚRY: ') === 0)
-				$variant->proportions = substr($item->textContent, strlen('ROZMĚRY: '));			  			
-			
-			//fotky
-			else if ($item->tagName == 'a' && $item->getAttribute('class') == 'cb-foto-g2')
-				$product->photos[] = $item->getAttribute('href');
-		}
-
-		$s = '<strong>'.$product->name.'</strong><br><small>'.$product->description.'</small><br>'
-				."výrobce: {$product->manufacturer['name']}, cena: {$variant->price}, velikost: {$variant->size}, rozměry: {$variant->proportions}";
-		$this->log($s, 4);  
-
-		return $product;
-	}
 	
 	/**
 	 * Fce prida nove vyrobce 
@@ -313,8 +351,6 @@ class ModelToolMimi2oc extends Model
 		$this->data = new stdClass();
 		$this->data->errors = array('todo' => 'diff - TODO');
 		$this->data->albums = array();
-		$this->data->products = array();
-		$this->data->categories = array();
 		$this->data->new_manufacturers = array();
 		$this->data->default_mapped_categories = array();
 		

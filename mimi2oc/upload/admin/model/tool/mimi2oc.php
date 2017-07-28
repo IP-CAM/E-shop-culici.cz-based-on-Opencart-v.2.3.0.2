@@ -10,6 +10,7 @@ class ModelToolMimi2oc extends Model
 	
 	private $categories;
 	private $manufacturers;
+	private $products;
 	
 	function __construct($registry)
 	{
@@ -25,7 +26,17 @@ class ModelToolMimi2oc extends Model
 		$this->manufacturers = $this->model_catalog_manufacturer->getManufacturers();
 		$keys = array_keys($this->manufacturers);
 		foreach ($keys as $key)
-			$this->manufacturers[$key]['lower_name'] = strtolower($this->manufacturers[$key]['name']);		
+			$this->manufacturers[$key]['lower_name'] = strtolower($this->manufacturers[$key]['name']);
+
+		//najdu produkty, ktere pochazeji z mimibazaru 
+		$this->load->model('catalog/product');
+		$prds = $this->model_catalog_product->getProducts();
+		$this->products = array();
+		foreach ($prds as $prd)
+		{
+			if (isset($prd['location']) /*&& strpos($prd['location'], 'mimi') === 0*/)
+				$this->products[$prd['location']] = $prd;
+		}
 	}
 	
 	private function log($text, $indent = 0)
@@ -137,6 +148,26 @@ class ModelToolMimi2oc extends Model
 	}	
 	
 	/**
+	 * Fce mezi oc produkty pochazejici z mimibazaru najde ten, co odpovida $uid a vrati jeho id. 
+	 * Zaroven ho ze seznamu odebere, aby v seznamu zustaly jen ty produkty, 
+	 * ktere jsou na OC, ale na mimibazaru uz ne.
+	 * 
+	 * @param unknown $uid
+	 * @return NULL
+	 */
+	private function _getOCProductId($uid)
+	{
+		if (isset($this->productIds[$uid]))
+		{
+			$result = $this->productIds[$uid]['p.product_id'];
+			unset($this->productIds[$uid]);
+			return $result;
+		}
+		else 
+			return NULL;
+	}
+	
+	/**
 	 * Stahne vsechny informace o tomto vyrobku ze stranek mimibazaru.
 	 *
 	 * @param unknown $id
@@ -208,7 +239,7 @@ class ModelToolMimi2oc extends Model
 		if ($product->name == NULL)
 			$product->name = '!!! CHYBÍ NÁZEV VÝROBKU !!!';
 		
-		//bud se jedna o novy produkt, nebo o variantu jiz existujiciho
+		//bud pridam cely produkt, nebo jenom variantu do jiz existujiciho
 		$uid = md5($product->name.'#'.$product->manufacturer['name']);
 		if (isset($album->products[$uid]))
 		{
@@ -220,7 +251,8 @@ class ModelToolMimi2oc extends Model
 		}
 		else
 		{
-			//novy produkt
+			//pridam produkt
+			$product->oc_product_id = $this->_getOCProductId($uid);
 			$album->products[$uid] = $product;
 		}
 	}	
@@ -285,7 +317,8 @@ class ModelToolMimi2oc extends Model
 		
 		//projdu alba, najdu produkty
 		//foreach ($this->data->albums as $album)
-		$album = $this->data->albums[11];
+		//$album = $this->data->albums[9];
+		foreach (array($this->data->albums[0], $this->data->albums[1]) as $album)
 		{
 			$this->log('Zpracovani alba: <strong>'.$album->name.'</strong>');
 			
@@ -316,6 +349,7 @@ class ModelToolMimi2oc extends Model
 			foreach ($album->products as $product)
 			{
 				$this->log('<strong>'.$product->name.'</strong>', 4);
+				$this->log('<small>akce: '.(isset($product->oc_product_id) ? 'update' : 'create').'</small>', 4);
 				$this->log('<small>popis: '.$product->description.'</small>', 4);
 				$this->log('<small>výrobce: '.$product->manufacturer['name'].'</small>', 4);
 				$this->log('<small>počet variant: '.count($product->variants).'</small>', 4);
@@ -336,7 +370,12 @@ class ModelToolMimi2oc extends Model
 					$this->log('<small>'.$h.'</small>', 8);
 				}
 			}
-			$this->log('');			
+			$this->log('');
+
+			//produkty, ktere na OC musim smazat
+			$this->log('<h1>SMAZAT</h1>');
+			foreach ($this->products as $product)
+				$this->log('name: '.$product['name']);
 		}	
 	}
 	
